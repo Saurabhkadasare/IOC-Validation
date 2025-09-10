@@ -15,7 +15,7 @@ st.markdown(
 try:
     API_KEY = st.secrets["virustotal_api_key"]
 except KeyError:
-    API_KEY = "5ff1d3fe0662f3508a64efeb0226837bc7b22d4e4e9cd149c01e8a6b610095ec"  # replace with your key for testing
+    API_KEY = "58d4205b4e34c92a90e825132af5d64b3c0d4b096c6ff8cf18cc1ad2534e6abb"  # replace with your key for testing
 
 headers = {"x-apikey": API_KEY}
 
