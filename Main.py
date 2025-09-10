@@ -26,27 +26,33 @@ def check_ioc(original_hash):
             attr = data["data"][0]["attributes"]
             sha256 = attr.get("sha256", "Not Found in VirusTotal")
             score = attr["last_analysis_stats"]["malicious"]
+
+            # Microsoft detection details
             ms = attr["last_analysis_results"].get("Microsoft", {})
-            verdict = ms.get("category", "Undetected")
+            if ms and ms.get("category") == "malicious":
+                verdict = ms.get("result", "Detected (no name)")
+            else:
+                verdict = "Undetected"
+
             return {
                 "Original Hash": original_hash,
                 "SHA256 Hash": sha256,
                 "Score": score,
-                "Microsoft": verdict
+                "Microsoft Detection Status": verdict
             }
         else:
             return {
                 "Original Hash": original_hash,
                 "SHA256 Hash": "Not Found in VirusTotal",
                 "Score": "Not Found in VirusTotal",
-                "Microsoft": "Not Found in VirusTotal"
+                "Microsoft Detection Status": "Not Found in VirusTotal"
             }
     else:
         return {
             "Original Hash": original_hash,
             "SHA256 Hash": "Not Found in VirusTotal",
             "Score": "Not Found in VirusTotal",
-            "Microsoft": "Not Found in VirusTotal"
+            "Microsoft Detection Status": "Not Found in VirusTotal"
         }
 
 # ---------------- Input Options ----------------
