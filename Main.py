@@ -11,7 +11,7 @@ st.markdown("Provide IOCs (MD5/SHA1/SHA256) either by **uploading a file** "
 
 # ---------------- API Key ----------------
 # 🔑 Replace with your VirusTotal API key
-API_KEY = "PUT-YOUR-API-KEY-HERE"
+API_KEY = "5ff1d3fe0662f3508a64efeb0226837bc7b22d4e4e9cd149c01e8a6b610095ec"
 headers = {"x-apikey": API_KEY}
 
 # ---------------- Helper Function ----------------
