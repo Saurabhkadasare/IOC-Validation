@@ -6,20 +6,12 @@ import time
 # ---------------- Streamlit UI ----------------
 st.set_page_config(page_title="IOC Validator Pro", layout="wide")
 st.title("🔍 Advanced IOC Validator with VirusTotal")
-st.markdown("""
-Upload a **TXT file** containing hashes (MD5/SHA1/SHA256)  
-**OR** paste hashes directly in the text area below.  
-The app will query VirusTotal and display results.
-""")
-
-uploaded_file = st.file_uploader("📂 Upload IOC TXT", type=["txt"])
-
-# Manual input
-manual_input = st.text_area("✍️ Or paste hashes here (one per line):")
+st.markdown("Provide IOCs (MD5/SHA1/SHA256) either by **uploading a file** "
+            "or by **pasting hashes directly**.")
 
 # ---------------- API Key ----------------
 # 🔑 Replace with your VirusTotal API key
-API_KEY = "5ff1d3fe0662f3508a64efeb0226837bc7b22d4e4e9cd149c01e8a6b610095ec"
+API_KEY = "PUT-YOUR-API-KEY-HERE"
 headers = {"x-apikey": API_KEY}
 
 # ---------------- Helper Function ----------------
@@ -57,21 +49,33 @@ def check_ioc(original_hash):
             "Microsoft": "Not Found in VirusTotal"
         }
 
-# ---------------- Main Logic ----------------
+# ---------------- Input Options ----------------
+st.subheader("📂 Upload File (TXT or Excel)")
+uploaded_file = st.file_uploader("Upload TXT or Excel file", type=["txt", "xlsx"])
+
+st.subheader("⌨️ Or Paste Hashes Manually")
+manual_input = st.text_area("Enter one hash per line")
+
+# Collect IOCs
 iocs = []
 
 if uploaded_file:
-    # Read TXT file → one hash per line
-    content = uploaded_file.read().decode("utf-8").splitlines()
-    iocs = [line.strip() for line in content if line.strip()]
+    if uploaded_file.name.endswith(".txt"):
+        content = uploaded_file.read().decode("utf-8").splitlines()
+        iocs.extend([line.strip() for line in content if line.strip()])
+    elif uploaded_file.name.endswith(".xlsx"):
+        df = pd.read_excel(uploaded_file)
+        iocs.extend(df.iloc[:, 0].dropna().astype(str).tolist())
 
-elif manual_input.strip():
-    # Read hashes from textarea
-    iocs = [line.strip() for line in manual_input.splitlines() if line.strip()]
+if manual_input.strip():
+    pasted_hashes = manual_input.splitlines()
+    iocs.extend([h.strip() for h in pasted_hashes if h.strip()])
 
+# ---------------- Main Logic ----------------
 if iocs:
-    results = []
+    st.info(f"🔎 Processing {len(iocs)} IOCs...")
 
+    results = []
     progress_bar = st.progress(0)
     status_text = st.empty()
 
@@ -84,7 +88,7 @@ if iocs:
         progress_bar.progress(progress)
         status_text.text(f"Processing {i+1}/{len(iocs)} ...")
 
-        time.sleep(1)  # avoid hitting API too fast on free tier
+        time.sleep(1)  # avoid hitting API too fast (for free tier)
 
     progress_bar.empty()
     status_text.empty()
@@ -96,3 +100,5 @@ if iocs:
 
     csv = result_df.to_csv(index=False).encode("utf-8")
     st.download_button("💾 Download Results as CSV", csv, "ioc_results.csv", "text/csv")
+else:
+    st.warning("⚠️ Please upload a file or paste hashes above to begin.")
