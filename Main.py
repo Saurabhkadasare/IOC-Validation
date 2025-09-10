@@ -6,7 +6,7 @@ from io import BytesIO
 
 # ---------------- Streamlit UI ----------------
 st.set_page_config(page_title="IOC Validator Pro", layout="wide")
-st.title("🔍 IOC Validator with VirusTotal (Free-Tier Safe)")
+st.title("🔍 IOC Validator with VirusTotal (BY Saurabh Kadasare 😎)")
 st.markdown(
     "Upload a TXT/Excel file or enter hashes manually. Free-tier limits are enforced automatically."
 )
