@@ -1,14 +1,13 @@
 import streamlit as st
 import pandas as pd
 import requests
-import hashlib
 import time
 
 # ---------------- Streamlit UI ----------------
 st.set_page_config(page_title="IOC Validator Pro", layout="wide")
 st.title("🔍 Advanced IOC Validator with VirusTotal")
 st.markdown("Upload a **TXT file** containing hashes (MD5/SHA1/SHA256). "
-            "The app will auto-convert MD5 → SHA256, query VirusTotal, and display results.")
+            "The app will query VirusTotal and display results.")
 
 uploaded_file = st.file_uploader("📂 Upload IOC TXT", type=["txt"])
 
@@ -17,21 +16,17 @@ API_KEY = st.secrets["VT_API_KEY"] if "VT_API_KEY" in st.secrets else "YOUR_VIRU
 headers = {"x-apikey": API_KEY}
 
 # ---------------- Helper Functions ----------------
-def convert_to_sha256(hash_value: str) -> str:
-    """Convert MD5 or SHA1 to SHA256. If already SHA256, just normalize."""
-    hash_value = hash_value.strip().lower()
-    if len(hash_value) == 32:  # MD5
-        return hashlib.sha256(bytes.fromhex(hash_value)).hexdigest()
-    elif len(hash_value) == 40:  # SHA1
-        return hashlib.sha256(bytes.fromhex(hash_value)).hexdigest()
-    elif len(hash_value) == 64:  # SHA256
-        return hash_value
+def normalize_hash(hash_value: str) -> str:
+    """Ensure the hash is in lowercase, valid length."""
+    hv = hash_value.strip().lower()
+    if len(hv) in [32, 40, 64]:  # MD5 / SHA1 / SHA256
+        return hv
     else:
-        return None  # Invalid format
+        return None
 
-def check_ioc(original_hash, sha256_hash):
+def check_ioc(original_hash, norm_hash):
     """Check IOC in VirusTotal and return results."""
-    if not sha256_hash:
+    if not norm_hash:
         return {
             "Original Hash": original_hash,
             "SHA256 Hash": "Invalid Hash",
@@ -39,7 +34,7 @@ def check_ioc(original_hash, sha256_hash):
             "Microsoft": "Not Found in VirusTotal"
         }
 
-    url = f"https://www.virustotal.com/api/v3/files/{sha256_hash}"
+    url = f"https://www.virustotal.com/api/v3/files/{norm_hash}"
     response = requests.get(url, headers=headers)
 
     if response.status_code == 200:
@@ -51,21 +46,21 @@ def check_ioc(original_hash, sha256_hash):
             verdict = ms.get("category", "Undetected")
             return {
                 "Original Hash": original_hash,
-                "SHA256 Hash": sha256_hash,
+                "SHA256 Hash": attr.get("sha256", norm_hash),
                 "Score": score,
                 "Microsoft": verdict
             }
         else:
             return {
                 "Original Hash": original_hash,
-                "SHA256 Hash": sha256_hash,
+                "SHA256 Hash": norm_hash,
                 "Score": "Not Found in VirusTotal",
                 "Microsoft": "Not Found in VirusTotal"
             }
     else:
         return {
             "Original Hash": original_hash,
-            "SHA256 Hash": sha256_hash,
+            "SHA256 Hash": norm_hash,
             "Score": "Not Found in VirusTotal",
             "Microsoft": "Not Found in VirusTotal"
         }
@@ -82,8 +77,8 @@ if uploaded_file:
     status_text = st.empty()
 
     for i, ioc in enumerate(iocs):
-        sha256_hash = convert_to_sha256(ioc)
-        result = check_ioc(ioc, sha256_hash)
+        norm_hash = normalize_hash(ioc)
+        result = check_ioc(ioc, norm_hash)
         results.append(result)
 
         # update UI progress
@@ -91,8 +86,7 @@ if uploaded_file:
         progress_bar.progress(progress)
         status_text.text(f"Processing {i+1}/{len(iocs)} ...")
 
-        # small delay (avoid API ban; real production can use retry/backoff logic)
-        time.sleep(1)
+        time.sleep(1)  # avoid hitting API too fast
 
     progress_bar.empty()
     status_text.empty()
