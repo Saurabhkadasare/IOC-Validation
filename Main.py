@@ -12,8 +12,13 @@ st.markdown(
 )
 
 # ---------------- API Key ----------------
-# 🔑 Replace with your VirusTotal API key
-API_KEY = st.secrets["5ff1d3fe0662f3508a64efeb0226837bc7b22d4e4e9cd149c01e8a6b610095ec"]  # safer than hardcoding
+# Option 1: Use Streamlit secrets (recommended)
+try:
+    API_KEY = st.secrets["virustotal_api_key"]
+except KeyError:
+    # Option 2: fallback to hardcoded key (for quick testing only)
+    API_KEY = "5ff1d3fe0662f3508a64efeb0226837bc7b22d4e4e9cd149c01e8a6b610095ec"
+
 headers = {"x-apikey": API_KEY}
 
 # ---------------- Helper Functions ----------------
