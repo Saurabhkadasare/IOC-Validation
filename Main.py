@@ -6,9 +6,9 @@ from io import BytesIO
 
 # ---------------- Streamlit UI ----------------
 st.set_page_config(page_title="IOC Validator Pro", layout="wide")
-st.title("🔍 IOC Validator with VirusTotal")
+st.title("🔍 IOC Validator with VirusTotal (Free-Tier Safe)")
 st.markdown(
-    "Upload a TXT/Excel file or enter hashes manually (one per line) to check them in VirusTotal."
+    "Upload a TXT/Excel file or enter hashes manually. Free-tier limits are enforced automatically."
 )
 
 # ---------------- API Key ----------------
@@ -115,7 +115,7 @@ if manual_input.strip():
 
 # ---------------- Main Logic ----------------
 if iocs:
-    st.info(f"🔎 Processing {len(iocs)} hashes...")
+    st.info(f"🔎 Processing {len(iocs)} hashes (Free-tier delay enforced)...")
     results = []
     progress_bar = st.progress(0)
     status_text = st.empty()
@@ -124,11 +124,14 @@ if iocs:
         result = check_ioc(ioc)
         results.append(result)
 
+        # update UI progress
         progress = int((i + 1) / len(iocs) * 100)
         progress_bar.progress(progress)
         status_text.text(f"Processing {i+1}/{len(iocs)} ...")
 
-        time.sleep(1)  # free-tier rate limit
+        # ---------------- Free-tier VT rate limit ----------------
+        if i < len(iocs) - 1:  # no need to sleep after last hash
+            time.sleep(15)  # 15 seconds per request for free-tier
 
     progress_bar.empty()
     status_text.empty()
@@ -142,7 +145,7 @@ if iocs:
     csv_data = result_df.to_csv(index=False).encode("utf-8")
     st.download_button("💾 Download as CSV", csv_data, "ioc_results.csv", "text/csv")
 
-    # Excel (requires openpyxl)
+    # Excel
     excel_buffer = BytesIO()
     result_df.to_excel(excel_buffer, index=False, engine='openpyxl')
     st.download_button(
