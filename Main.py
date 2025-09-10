@@ -7,10 +7,10 @@ import time
 # ---------------- Streamlit UI ----------------
 st.set_page_config(page_title="IOC Validator Pro", layout="wide")
 st.title("🔍 Advanced IOC Validator with VirusTotal")
-st.markdown("Upload a **CSV file** containing hashes (MD5/SHA1/SHA256). "
+st.markdown("Upload a **TXT file** containing hashes (MD5/SHA1/SHA256). "
             "The app will auto-convert MD5 → SHA256, query VirusTotal, and display results.")
 
-uploaded_file = st.file_uploader("📂 Upload IOC CSV", type=["csv"])
+uploaded_file = st.file_uploader("📂 Upload IOC TXT", type=["txt"])
 
 # Get API key securely
 API_KEY = st.secrets["VT_API_KEY"] if "VT_API_KEY" in st.secrets else "YOUR_VIRUSTOTAL_API_KEY"
@@ -18,7 +18,7 @@ headers = {"x-apikey": API_KEY}
 
 # ---------------- Helper Functions ----------------
 def convert_to_sha256(hash_value: str) -> str:
-    """Convert MD5 to SHA256. If already SHA1/SHA256, just normalize."""
+    """Convert MD5 or SHA1 to SHA256. If already SHA256, just normalize."""
     hash_value = hash_value.strip().lower()
     if len(hash_value) == 32:  # MD5
         return hashlib.sha256(bytes.fromhex(hash_value)).hexdigest()
@@ -72,11 +72,10 @@ def check_ioc(original_hash, sha256_hash):
 
 # ---------------- Main Logic ----------------
 if uploaded_file:
-    df = pd.read_csv(uploaded_file)
-    if df.shape[1] > 1:
-        st.warning("⚠️ Only the first column will be used as IOC input.")
+    # Read TXT file → one hash per line
+    content = uploaded_file.read().decode("utf-8").splitlines()
+    iocs = [line.strip() for line in content if line.strip()]
 
-    iocs = df.iloc[:, 0].dropna().tolist()
     results = []
 
     progress_bar = st.progress(0)
