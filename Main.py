@@ -16,7 +16,7 @@ st.markdown(
 try:
     API_KEY = st.secrets["virustotal_api_key"]
 except KeyError:
-    # Option 2: fallback to hardcoded key (for quick testing only)
+    # Option 2: fallback to hardcoded key (for testing only)
     API_KEY = "5ff1d3fe0662f3508a64efeb0226837bc7b22d4e4e9cd149c01e8a6b610095ec"
 
 headers = {"x-apikey": API_KEY}
@@ -35,17 +35,13 @@ def check_ioc(original_hash):
     url = f"https://www.virustotal.com/api/v3/files/{original_hash}"
     try:
         response = requests.get(url, headers=headers)
+
         if response.status_code == 200:
             data = response.json().get("data", {}).get("attributes", {})
 
             sha256 = data.get("sha256", "Not Found in VirusTotal")
+            score = data.get("last_analysis_stats", {}).get("malicious", "Not Found in VirusTotal")
 
-            # last_analysis_stats might be missing
-            score = data.get("last_analysis_stats", {}).get("malicious")
-            if score is None:
-                score = "Not Found in VirusTotal"
-
-            # Microsoft detection
             ms = data.get("last_analysis_results", {}).get("Microsoft")
             if ms:
                 verdict = ms.get("result") if ms.get("category") == "malicious" else "Undetected"
@@ -60,24 +56,35 @@ def check_ioc(original_hash):
             }
 
         elif response.status_code == 404:
-            # Hash not found
             return {
                 "Original Hash": original_hash,
                 "SHA256 Hash": "Not Found in VirusTotal",
                 "Malicious Score": "Not Found in VirusTotal",
                 "Microsoft Detection Status": "Not Found in VirusTotal"
             }
-        else:
-            # Other HTTP errors
+        elif response.status_code == 401:
             return {
                 "Original Hash": original_hash,
-                "SHA256 Hash": "Unavailable",
-                "Malicious Score": "Unavailable",
-                "Microsoft Detection Status": "Unavailable"
+                "SHA256 Hash": "Invalid API Key",
+                "Malicious Score": "Invalid API Key",
+                "Microsoft Detection Status": "Invalid API Key"
+            }
+        elif response.status_code == 429:
+            return {
+                "Original Hash": original_hash,
+                "SHA256 Hash": "Rate Limited",
+                "Malicious Score": "Rate Limited",
+                "Microsoft Detection Status": "Rate Limited"
+            }
+        else:
+            return {
+                "Original Hash": original_hash,
+                "SHA256 Hash": f"HTTP {response.status_code}",
+                "Malicious Score": f"HTTP {response.status_code}",
+                "Microsoft Detection Status": f"HTTP {response.status_code}"
             }
 
     except Exception as e:
-        # Network or parsing errors
         return {
             "Original Hash": original_hash,
             "SHA256 Hash": f"Error: {str(e)}",
@@ -126,7 +133,7 @@ if iocs:
         progress_bar.progress(progress)
         status_text.text(f"Processing {i+1}/{len(iocs)} ...")
 
-        time.sleep(1)  # avoid hitting API too fast (for free tier)
+        time.sleep(1)  # avoid hitting API too fast (free tier)
 
     progress_bar.empty()
     status_text.empty()
