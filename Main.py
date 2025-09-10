@@ -31,39 +31,58 @@ def valid_hash(h):
     )
 
 def check_ioc(original_hash):
-    """Check IOC in VirusTotal using the file endpoint."""
+    """Check IOC in VirusTotal using the file endpoint with robust error handling."""
     url = f"https://www.virustotal.com/api/v3/files/{original_hash}"
-    response = requests.get(url, headers=headers)
+    try:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            data = response.json().get("data", {}).get("attributes", {})
 
-    if response.status_code == 200:
-        attr = response.json().get("data", {}).get("attributes", {})
-        sha256 = attr.get("sha256", "Not Found in VirusTotal")
-        score = attr.get("last_analysis_stats", {}).get("malicious", 0)
+            sha256 = data.get("sha256", "Not Found in VirusTotal")
 
-        # Microsoft detection details
-        ms = attr.get("last_analysis_results", {}).get("Microsoft", {})
-        verdict = ms.get("result") if ms and ms.get("category") == "malicious" else "Undetected"
+            # last_analysis_stats might be missing
+            score = data.get("last_analysis_stats", {}).get("malicious")
+            if score is None:
+                score = "Not Found in VirusTotal"
 
+            # Microsoft detection
+            ms = data.get("last_analysis_results", {}).get("Microsoft")
+            if ms:
+                verdict = ms.get("result") if ms.get("category") == "malicious" else "Undetected"
+            else:
+                verdict = "Undetected"
+
+            return {
+                "Original Hash": original_hash,
+                "SHA256 Hash": sha256,
+                "Malicious Score": score,
+                "Microsoft Detection Status": verdict
+            }
+
+        elif response.status_code == 404:
+            # Hash not found
+            return {
+                "Original Hash": original_hash,
+                "SHA256 Hash": "Not Found in VirusTotal",
+                "Malicious Score": "Not Found in VirusTotal",
+                "Microsoft Detection Status": "Not Found in VirusTotal"
+            }
+        else:
+            # Other HTTP errors
+            return {
+                "Original Hash": original_hash,
+                "SHA256 Hash": "Unavailable",
+                "Malicious Score": "Unavailable",
+                "Microsoft Detection Status": "Unavailable"
+            }
+
+    except Exception as e:
+        # Network or parsing errors
         return {
             "Original Hash": original_hash,
-            "SHA256 Hash": sha256,
-            "Malicious Score": score,
-            "Microsoft Detection Status": verdict
-        }
-
-    elif response.status_code == 404:
-        return {
-            "Original Hash": original_hash,
-            "SHA256 Hash": "Not Found in VirusTotal",
-            "Malicious Score": "Not Found in VirusTotal",
-            "Microsoft Detection Status": "Not Found in VirusTotal"
-        }
-    else:
-        return {
-            "Original Hash": original_hash,
-            "SHA256 Hash": "Error",
-            "Malicious Score": "Error",
-            "Microsoft Detection Status": "Error"
+            "SHA256 Hash": f"Error: {str(e)}",
+            "Malicious Score": f"Error: {str(e)}",
+            "Microsoft Detection Status": f"Error: {str(e)}"
         }
 
 # ---------------- Input Options ----------------
