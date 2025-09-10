@@ -2,12 +2,13 @@ import streamlit as st
 import pandas as pd
 import requests
 import time
+from io import BytesIO
 
 # ---------------- Streamlit UI ----------------
 st.set_page_config(page_title="IOC Validator Pro", layout="wide")
 st.title("🔍 IOC Validator with VirusTotal")
 st.markdown(
-    "Upload a TXT or Excel file containing hashes to check them in VirusTotal."
+    "Upload a TXT/Excel file or enter hashes manually (one per line) to check them in VirusTotal."
 )
 
 # ---------------- API Key ----------------
@@ -20,15 +21,14 @@ headers = {"x-apikey": API_KEY}
 
 # ---------------- Helper Functions ----------------
 def valid_hash(h):
-    """Check if the string is MD5, SHA1, or SHA256"""
     h = h.strip()
     return len(h) in [32, 40, 64] and all(c in "0123456789abcdefABCDEF" for c in h)
 
 def check_ioc(original_hash):
-    """Check a hash in VirusTotal and return the required 4 columns"""
     url = f"https://www.virustotal.com/api/v3/files/{original_hash}"
     try:
         response = requests.get(url, headers=headers)
+
         if response.status_code == 200:
             data = response.json().get("data", {}).get("attributes", {})
 
@@ -89,9 +89,13 @@ def check_ioc(original_hash):
 st.subheader("📂 Upload File")
 uploaded_file = st.file_uploader("Upload TXT or Excel file", type=["txt", "xlsx"])
 
+st.subheader("⌨️ Or Enter Hashes Manually")
+manual_input = st.text_area("Enter one hash per line")
+
 # ---------------- Collect Hashes ----------------
 iocs = []
 
+# From file
 if uploaded_file:
     if uploaded_file.name.endswith(".txt"):
         content = uploaded_file.read().decode("utf-8").splitlines()
@@ -101,6 +105,11 @@ if uploaded_file:
         column = st.selectbox("Select the column containing hashes", df.columns)
         iocs.extend(df[column].dropna().astype(str).tolist())
         iocs = [h for h in iocs if valid_hash(h)]
+
+# From manual input
+if manual_input.strip():
+    pasted_hashes = manual_input.splitlines()
+    iocs.extend([h.strip() for h in pasted_hashes if valid_hash(h.strip())])
 
 # ---------------- Main Logic ----------------
 if iocs:
@@ -117,7 +126,7 @@ if iocs:
         progress_bar.progress(progress)
         status_text.text(f"Processing {i+1}/{len(iocs)} ...")
 
-        time.sleep(1)  # avoid hitting free-tier API rate limit
+        time.sleep(1)  # free-tier rate limit
 
     progress_bar.empty()
     status_text.empty()
@@ -126,7 +135,14 @@ if iocs:
     st.success("✅ Validation Complete!")
     st.dataframe(result_df, use_container_width=True)
 
-    csv = result_df.to_csv(index=False).encode("utf-8")
-    st.download_button("💾 Download CSV Results", csv, "ioc_results.csv", "text/csv")
+    # ---------------- Download Options ----------------
+    csv_data = result_df.to_csv(index=False).encode("utf-8")
+    st.download_button("💾 Download as CSV", csv_data, "ioc_results.csv", "text/csv")
+
+    # Excel download
+    excel_buffer = BytesIO()
+    result_df.to_excel(excel_buffer, index=False)
+    st.download_button("💾 Download as Excel", excel_buffer, "ioc_results.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
 else:
-    st.warning("⚠️ Please upload a valid TXT or Excel file containing hashes.")
+    st.warning("⚠️ Please upload a file or enter valid hashes manually.")
