@@ -21,10 +21,12 @@ headers = {"x-apikey": API_KEY}
 
 # ---------------- Helper Functions ----------------
 def valid_hash(h):
+    """Check if the string is MD5, SHA1, or SHA256"""
     h = h.strip()
     return len(h) in [32, 40, 64] and all(c in "0123456789abcdefABCDEF" for c in h)
 
 def check_ioc(original_hash):
+    """Check a hash in VirusTotal and return the required 4 columns"""
     url = f"https://www.virustotal.com/api/v3/files/{original_hash}"
     try:
         response = requests.get(url, headers=headers)
@@ -136,13 +138,19 @@ if iocs:
     st.dataframe(result_df, use_container_width=True)
 
     # ---------------- Download Options ----------------
+    # CSV
     csv_data = result_df.to_csv(index=False).encode("utf-8")
     st.download_button("💾 Download as CSV", csv_data, "ioc_results.csv", "text/csv")
 
-    # Excel download
+    # Excel (requires openpyxl)
     excel_buffer = BytesIO()
-    result_df.to_excel(excel_buffer, index=False)
-    st.download_button("💾 Download as Excel", excel_buffer, "ioc_results.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    result_df.to_excel(excel_buffer, index=False, engine='openpyxl')
+    st.download_button(
+        "💾 Download as Excel",
+        excel_buffer,
+        "ioc_results.xlsx",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 else:
     st.warning("⚠️ Please upload a file or enter valid hashes manually.")
