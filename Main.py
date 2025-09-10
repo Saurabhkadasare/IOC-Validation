@@ -6,53 +6,59 @@ import time
 # ---------------- Streamlit UI ----------------
 st.set_page_config(page_title="IOC Validator Pro", layout="wide")
 st.title("🔍 Advanced IOC Validator with VirusTotal")
-st.markdown("Provide IOCs (MD5/SHA1/SHA256) either by **uploading a file** "
-            "or by **pasting hashes directly**.")
+st.markdown(
+    "Provide IOCs (MD5/SHA1/SHA256) either by **uploading a file** "
+    "or by **pasting hashes directly**."
+)
 
 # ---------------- API Key ----------------
 # 🔑 Replace with your VirusTotal API key
-API_KEY = "5ff1d3fe0662f3508a64efeb0226837bc7b22d4e4e9cd149c01e8a6b610095ec"
+API_KEY = st.secrets["5ff1d3fe0662f3508a64efeb0226837bc7b22d4e4e9cd149c01e8a6b610095ec"]  # safer than hardcoding
 headers = {"x-apikey": API_KEY}
 
-# ---------------- Helper Function ----------------
+# ---------------- Helper Functions ----------------
+def valid_hash(h):
+    """Validate if the input string is MD5, SHA1, or SHA256."""
+    h = h.strip()
+    return (
+        len(h) in [32, 40, 64]
+        and all(c in "0123456789abcdefABCDEF" for c in h)
+    )
+
 def check_ioc(original_hash):
-    """Check IOC in VirusTotal using search endpoint and return results."""
-    url = f"https://www.virustotal.com/api/v3/search?query={original_hash}"
+    """Check IOC in VirusTotal using the file endpoint."""
+    url = f"https://www.virustotal.com/api/v3/files/{original_hash}"
     response = requests.get(url, headers=headers)
 
     if response.status_code == 200:
-        data = response.json()
-        if data.get("data"):
-            attr = data["data"][0]["attributes"]
-            sha256 = attr.get("sha256", "Not Found in VirusTotal")
-            score = attr["last_analysis_stats"]["malicious"]
+        attr = response.json().get("data", {}).get("attributes", {})
+        sha256 = attr.get("sha256", "Not Found in VirusTotal")
+        score = attr.get("last_analysis_stats", {}).get("malicious", 0)
 
-            # Microsoft detection details
-            ms = attr["last_analysis_results"].get("Microsoft", {})
-            if ms and ms.get("category") == "malicious":
-                verdict = ms.get("result", "Detected (no name)")
-            else:
-                verdict = "Undetected"
+        # Microsoft detection details
+        ms = attr.get("last_analysis_results", {}).get("Microsoft", {})
+        verdict = ms.get("result") if ms and ms.get("category") == "malicious" else "Undetected"
 
-            return {
-                "Original Hash": original_hash,
-                "SHA256 Hash": sha256,
-                "Score": score,
-                "Microsoft Detection Status": verdict
-            }
-        else:
-            return {
-                "Original Hash": original_hash,
-                "SHA256 Hash": "Not Found in VirusTotal",
-                "Score": "Not Found in VirusTotal",
-                "Microsoft Detection Status": "Not Found in VirusTotal"
-            }
-    else:
+        return {
+            "Original Hash": original_hash,
+            "SHA256 Hash": sha256,
+            "Malicious Score": score,
+            "Microsoft Detection Status": verdict
+        }
+
+    elif response.status_code == 404:
         return {
             "Original Hash": original_hash,
             "SHA256 Hash": "Not Found in VirusTotal",
-            "Score": "Not Found in VirusTotal",
+            "Malicious Score": "Not Found in VirusTotal",
             "Microsoft Detection Status": "Not Found in VirusTotal"
+        }
+    else:
+        return {
+            "Original Hash": original_hash,
+            "SHA256 Hash": "Error",
+            "Malicious Score": "Error",
+            "Microsoft Detection Status": "Error"
         }
 
 # ---------------- Input Options ----------------
@@ -68,14 +74,16 @@ iocs = []
 if uploaded_file:
     if uploaded_file.name.endswith(".txt"):
         content = uploaded_file.read().decode("utf-8").splitlines()
-        iocs.extend([line.strip() for line in content if line.strip()])
+        iocs.extend([line.strip() for line in content if valid_hash(line.strip())])
     elif uploaded_file.name.endswith(".xlsx"):
         df = pd.read_excel(uploaded_file)
-        iocs.extend(df.iloc[:, 0].dropna().astype(str).tolist())
+        column = st.selectbox("Select the column containing hashes", df.columns)
+        iocs.extend(df[column].dropna().astype(str).tolist())
+        iocs = [h for h in iocs if valid_hash(h)]
 
 if manual_input.strip():
     pasted_hashes = manual_input.splitlines()
-    iocs.extend([h.strip() for h in pasted_hashes if h.strip()])
+    iocs.extend([h.strip() for h in pasted_hashes if valid_hash(h.strip())])
 
 # ---------------- Main Logic ----------------
 if iocs:
@@ -102,9 +110,15 @@ if iocs:
     result_df = pd.DataFrame(results)
 
     st.success("✅ Validation Complete!")
-    st.dataframe(result_df, use_container_width=True)
+
+    # Conditional formatting for Microsoft Detection
+    def highlight_malicious(val):
+        color = "red" if val not in ["Undetected", "Not Found in VirusTotal"] else "green"
+        return f"background-color: {color}"
+
+    st.dataframe(result_df.style.applymap(highlight_malicious, subset=["Microsoft Detection Status"]), use_container_width=True)
 
     csv = result_df.to_csv(index=False).encode("utf-8")
     st.download_button("💾 Download Results as CSV", csv, "ioc_results.csv", "text/csv")
 else:
-    st.warning("⚠️ Please upload a file or paste hashes above to begin.")
+    st.warning("⚠️ Please upload a file or paste valid hashes above to begin.")
