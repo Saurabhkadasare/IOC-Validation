@@ -12,7 +12,7 @@ st.markdown("Upload a **TXT file** containing hashes (MD5/SHA1/SHA256). "
 uploaded_file = st.file_uploader("📂 Upload IOC TXT", type=["txt"])
 
 # Get API key securely
-API_KEY = st.secrets["VT_API_KEY"] if "VT_API_KEY" in st.secrets else "YOUR_VIRUSTOTAL_API_KEY"
+API_KEY = st.secrets["VT_API_KEY"] if "VT_API_KEY" in st.secrets else "5ff1d3fe0662f3508a64efeb0226837bc7b22d4e4e9cd149c01e8a6b610095ec"
 headers = {"x-apikey": API_KEY}
 
 # ---------------- Helper Functions ----------------
