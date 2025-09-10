@@ -7,7 +7,7 @@ from io import BytesIO
 # ---------------- Background & Styling ----------------
 st.set_page_config(page_title="IOC Validator Pro", layout="wide")
 
-# Professional cybersecurity/hacking background
+# Professional cybersecurity/hacking background (no dark overlay)
 st.markdown(
     """
     <style>
@@ -16,7 +16,6 @@ st.markdown(
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
-        filter: brightness(0.65); /* dark overlay for readability */
         color: #ffffff;
     }
     .css-1v3fvcr { color: #ffffff; } /* headings */
