@@ -34,25 +34,18 @@ def check_ioc(original_hash):
     url = f"https://www.virustotal.com/api/v3/files/{original_hash}"
     try:
         response = requests.get(url, headers=headers)
-        
         if response.status_code == 200:
             data = response.json().get("data", {}).get("attributes", {})
             sha256 = data.get("sha256", "Not Found in VT")
             score = data.get("last_analysis_stats", {}).get("malicious", "Not Found in VT")
-            
             ms = data.get("last_analysis_results", {}).get("Microsoft")
-            if ms and ms.get("category") == "malicious":
-                verdict = f"Detected ({ms.get('result')})"
-            else:
-                verdict = "Undetected"
-            
+            verdict = f"Detected ({ms.get('result')})" if ms and ms.get("category") == "malicious" else "Undetected"
             return {
                 "Original Hash": original_hash,
                 "SHA256 Hash": sha256,
                 "VirusTotal Score": score,
                 "Microsoft Detection": verdict
             }
-        
         elif response.status_code == 404:
             return {
                 "Original Hash": original_hash,
@@ -60,7 +53,6 @@ def check_ioc(original_hash):
                 "VirusTotal Score": "Not Found in VT",
                 "Microsoft Detection": "Not Found in VT"
             }
-        
         elif response.status_code == 401:
             return {
                 "Original Hash": original_hash,
@@ -68,7 +60,6 @@ def check_ioc(original_hash):
                 "VirusTotal Score": "Invalid API Key",
                 "Microsoft Detection": "Invalid API Key"
             }
-        
         elif response.status_code == 429:
             return {
                 "Original Hash": original_hash,
@@ -76,7 +67,6 @@ def check_ioc(original_hash):
                 "VirusTotal Score": "Rate Limited",
                 "Microsoft Detection": "Rate Limited"
             }
-        
         else:
             return {
                 "Original Hash": original_hash,
@@ -84,7 +74,6 @@ def check_ioc(original_hash):
                 "VirusTotal Score": f"HTTP {response.status_code}",
                 "Microsoft Detection": f"HTTP {response.status_code}"
             }
-
     except Exception as e:
         return {
             "Original Hash": original_hash,
@@ -127,32 +116,24 @@ if iocs:
     results = []
     progress_bar = st.progress(0)
     status_text = st.empty()
-    scanner_text = st.empty()  # Animated scanner
 
-    last_request_time = 0  # Track last API call
+    last_request_time = 0
 
     for i, ioc in enumerate(iocs):
-        # Ensure minimum interval between requests (15 seconds for free tier)
+        # Ensure minimum 15s interval for free-tier
         elapsed = time.time() - last_request_time
         if elapsed < 15:
             time.sleep(15 - elapsed)
 
-        # Animated live scanner (short animation)
-        for dot in range(4):
-            scanner_text.markdown(f"<p style='color:#00C9FF; font-weight:bold;'>Scanning IOC: {ioc} {'•'*dot}</p>", unsafe_allow_html=True)
-            time.sleep(0.3)
-
         result = check_ioc(ioc)
         results.append(result)
-        last_request_time = time.time()  # Update last request timestamp
+        last_request_time = time.time()
 
-        progress = int((i + 1) / len(iocs) * 100)
-        progress_bar.progress(progress)
+        progress_bar.progress(int((i+1)/len(iocs)*100))
         status_text.text(f"Processed {i+1}/{len(iocs)} hashes")
 
     progress_bar.empty()
     status_text.empty()
-    scanner_text.empty()
 
     result_df = pd.DataFrame(results)
 
