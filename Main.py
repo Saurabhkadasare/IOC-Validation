@@ -7,7 +7,6 @@ from io import BytesIO
 # ---------------- Streamlit UI ----------------
 st.set_page_config(page_title="IOC Validator Pro", layout="wide")
 
-# Title and subtitle
 st.markdown(
     """
     <h1 style='text-align: center; color: green;'>🔍 IOC Validation with VirusTotal</h1>
@@ -35,36 +34,64 @@ def check_ioc(original_hash):
     url = f"https://www.virustotal.com/api/v3/files/{original_hash}"
     try:
         response = requests.get(url, headers=headers)
+        
         if response.status_code == 200:
             data = response.json().get("data", {}).get("attributes", {})
             sha256 = data.get("sha256", "Not Found in VT")
             score = data.get("last_analysis_stats", {}).get("malicious", "Not Found in VT")
+            
             ms = data.get("last_analysis_results", {}).get("Microsoft")
             if ms and ms.get("category") == "malicious":
                 verdict = f"Detected ({ms.get('result')})"
             else:
                 verdict = "Undetected"
+            
             return {
                 "Original Hash": original_hash,
                 "SHA256 Hash": sha256,
                 "VirusTotal Score": score,
                 "Microsoft Detection": verdict
             }
+        
         elif response.status_code == 404:
-            return {k: "Not Found in VT" for k in 
-                    ["Original Hash", "SHA256 Hash", "VirusTotal Score", "Microsoft Detection"]}
+            return {
+                "Original Hash": original_hash,
+                "SHA256 Hash": "Not Found in VT",
+                "VirusTotal Score": "Not Found in VT",
+                "Microsoft Detection": "Not Found in VT"
+            }
+        
         elif response.status_code == 401:
-            return {k: "Invalid API Key" for k in 
-                    ["Original Hash", "SHA256 Hash", "VirusTotal Score", "Microsoft Detection"]}
+            return {
+                "Original Hash": original_hash,
+                "SHA256 Hash": "Invalid API Key",
+                "VirusTotal Score": "Invalid API Key",
+                "Microsoft Detection": "Invalid API Key"
+            }
+        
         elif response.status_code == 429:
-            return {k: "Rate Limited" for k in 
-                    ["Original Hash", "SHA256 Hash", "VirusTotal Score", "Microsoft Detection"]}
+            return {
+                "Original Hash": original_hash,
+                "SHA256 Hash": "Rate Limited",
+                "VirusTotal Score": "Rate Limited",
+                "Microsoft Detection": "Rate Limited"
+            }
+        
         else:
-            return {k: f"HTTP {response.status_code}" for k in 
-                    ["Original Hash", "SHA256 Hash", "VirusTotal Score", "Microsoft Detection"]}
+            return {
+                "Original Hash": original_hash,
+                "SHA256 Hash": f"HTTP {response.status_code}",
+                "VirusTotal Score": f"HTTP {response.status_code}",
+                "Microsoft Detection": f"HTTP {response.status_code}"
+            }
+
     except Exception as e:
-        return {k: f"Error: {str(e)}" for k in 
-                ["Original Hash", "SHA256 Hash", "VirusTotal Score", "Microsoft Detection"]}
+        return {
+            "Original Hash": original_hash,
+            "SHA256 Hash": f"Error: {str(e)}",
+            "VirusTotal Score": f"Error: {str(e)}",
+            "Microsoft Detection": f"Error: {str(e)}"
+        }
 
 # ---------------- Input Options ----------------
 with st.expander("📂 Upload File (TXT/Excel)", expanded=True):
@@ -102,21 +129,26 @@ if iocs:
     status_text = st.empty()
     scanner_text = st.empty()  # Animated scanner
 
+    last_request_time = 0  # Track last API call
+
     for i, ioc in enumerate(iocs):
-        # Animated live scanner
+        # Ensure minimum interval between requests (15 seconds for free tier)
+        elapsed = time.time() - last_request_time
+        if elapsed < 15:
+            time.sleep(15 - elapsed)
+
+        # Animated live scanner (short animation)
         for dot in range(4):
             scanner_text.markdown(f"<p style='color:#00C9FF; font-weight:bold;'>Scanning IOC: {ioc} {'•'*dot}</p>", unsafe_allow_html=True)
-            time.sleep(0.5)
+            time.sleep(0.3)
 
         result = check_ioc(ioc)
         results.append(result)
+        last_request_time = time.time()  # Update last request timestamp
+
         progress = int((i + 1) / len(iocs) * 100)
         progress_bar.progress(progress)
         status_text.text(f"Processed {i+1}/{len(iocs)} hashes")
-
-        # Free-tier delay
-        if i < len(iocs) - 1:
-            time.sleep(10)
 
     progress_bar.empty()
     status_text.empty()
